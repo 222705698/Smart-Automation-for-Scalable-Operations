@@ -43,7 +43,7 @@ const SignUp = () => {
             // });
             console.log('User signed up successfully');
 
-            navigate("/signin");
+            navigate("/");
 
             })
             .catch((error) => {
