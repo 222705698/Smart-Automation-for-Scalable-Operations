@@ -1,2 +1,8 @@
 node_modules/
+<<<<<<< HEAD
 .env
+=======
+.env
+smart-seat-allocation/node_modules/
+seat-allocation-backend/node_modules/
+>>>>>>> 496793c5939f3c9b9d3358804c5d36f34db80a52
