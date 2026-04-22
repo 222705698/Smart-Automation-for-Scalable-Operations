@@ -1,46 +1,91 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import mockData from '../mock-data.json';
+import allocationsData from '../allocations.json';
+import adminData from '../admin-data.json';
+import { auth } from '../firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import SessionCard from '../components/SessionCard';
 
-type Department = 'Division A' | 'Division B' | 'Division C';
-type SessionId = 'Morning' | 'Midday' | 'Afternoon';
+export type Department = 'Division A' | 'Division B' | 'Division C';
+export type SessionId = 'Morning' | 'Midday' | 'Afternoon';
 
-const DEPT_LIMITS: Record<Department, number> = {
+export const DEPT_LIMITS: Record<Department, number> = {
   'Division A': 8,
   'Division B': 6,
   'Division C': 6,
 };
 
-const TOTAL_CAPACITY_PER_SESSION = 20;
+export const TOTAL_CAPACITY_PER_SESSION = 20;
 
-interface Session {
+export interface Session {
   id: SessionId;
   time: string;
   allocated: Record<Department, number>;
+  participants: string[];
 }
 
-const initialSessions: Session[] = [
-  { id: 'Morning', time: '09:00 - 10:30', allocated: { 'Division A': 0, 'Division B': 0, 'Division C': 0 } },
-  { id: 'Midday', time: '11:00 - 12:30', allocated: { 'Division A': 0, 'Division B': 0, 'Division C': 0 } },
-  { id: 'Afternoon', time: '13:00 - 14:30', allocated: { 'Division A': 0, 'Division B': 0, 'Division C': 0 } },
-];
+// 1. IMPORT MOCK USERS
+interface User {
+  id: string;
+  name: string;
+  division: Department;
+}
+
+const MOCK_USERS: User[] = mockData as User[];
+
+// 2. IMPORT PRE-ASSIGNED SESSIONS
+const initialSessions: Session[] = allocationsData as Session[];
+
+// 3. TRACK WHICH USERS ARE ALREADY ASSIGNED
+const initialAssigned = new Set<string>();
+initialSessions.forEach(session => {
+  session.participants.forEach(p => initialAssigned.add(p.toLowerCase()));
+});
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>(initialSessions);
   const [adminDept, setAdminDept] = useState<Department>('Division A');
-  const [selectedSession, setSelectedSession] = useState<SessionId>('Morning');
+  const [adminName, setAdminName] = useState<string>('Loading...');
+  const [selectedSession, setSelectedSession] = useState<SessionId>('Afternoon'); // Default to Afternoon since Morning is full
   const [participantName, setParticipantName] = useState('');
   const [feedback, setFeedback] = useState<{ message: string; type: 'error' | 'success' | null }>({ message: '', type: null });
 
   // Mock assigned participants to prevent duplicate assignments
-  const [assignedParticipants, setAssignedParticipants] = useState<Set<string>>(new Set());
+  const [assignedParticipants, setAssignedParticipants] = useState<Set<string>>(initialAssigned);
+
+  // Track logged in user and assign their division
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        const currentAdmin = adminData.find(a => a.email.toLowerCase() === user.email?.toLowerCase());
+        if (currentAdmin) {
+          setAdminDept(currentAdmin.division as Department);
+          setAdminName(currentAdmin.name);
+        } else {
+          setAdminDept('Division A'); // Fallback for unknown emails
+          setAdminName(user.email);
+        }
+      } else {
+        navigate('/'); // Redirect to login if not authenticated
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
+
+  // Clear selections when switching admin roles
+  useEffect(() => {
+    setParticipantName('');
+    setFeedback({ message: '', type: null });
+  }, [adminDept]);
 
   const handleAllocate = (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback({ message: '', type: null });
 
     if (!participantName.trim()) {
-      setFeedback({ message: 'Please enter a participant name.', type: 'error' });
+      setFeedback({ message: 'Please select a participant.', type: 'error' });
       return;
     }
 
@@ -73,6 +118,7 @@ const Dashboard = () => {
     // If valid, apply allocation
     const updatedSessions = [...sessions];
     updatedSessions[sessionIndex].allocated[adminDept] += 1;
+    updatedSessions[sessionIndex].participants.push(participantName);
     
     setSessions(updatedSessions);
     setAssignedParticipants(new Set(assignedParticipants).add(nameKey));
@@ -89,20 +135,14 @@ const Dashboard = () => {
           <p className="text-sm text-green-300">Training Session Management</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-green-200">Admin Role:</label>
-            <select 
-              value={adminDept}
-              onChange={(e) => setAdminDept(e.target.value as Department)}
-              className="bg-green-800 text-white border border-green-700 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="Division A">Division A</option>
-              <option value="Division B">Division B</option>
-              <option value="Division C">Division C</option>
-            </select>
+          <div className="flex items-center gap-3 mr-2 text-right">
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-white">{adminName}</span>
+              <span className="text-xs text-green-300">{adminDept} Admin</span>
+            </div>
           </div>
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => signOut(auth).then(() => navigate('/'))}
             className="bg-green-700 hover:bg-green-600 px-4 py-2 rounded-lg text-sm font-semibold transition"
           >
             Log Out
@@ -117,61 +157,9 @@ const Dashboard = () => {
           <h2 className="text-2xl font-bold text-gray-800 border-b border-gray-300 pb-2">Session Capacity Overview</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sessions.map((session) => {
-              const totalAllocated = Object.values(session.allocated).reduce((a, b) => a + b, 0);
-              const remaining = TOTAL_CAPACITY_PER_SESSION - totalAllocated;
-              const isFull = remaining === 0;
-
-              return (
-                <div key={session.id} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden flex flex-col">
-                  <div className={`p-4 text-white ${isFull ? 'bg-red-800' : 'bg-green-800'}`}>
-                    <h3 className="font-bold text-lg">{session.id} Session</h3>
-                    <p className="text-sm opacity-90">{session.time}</p>
-                  </div>
-                  
-                  <div className="p-4 flex-grow">
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-sm font-semibold text-gray-600">Total Capacity</span>
-                      <span className={`font-bold ${isFull ? 'text-red-600' : 'text-green-700'}`}>
-                        {totalAllocated} / {TOTAL_CAPACITY_PER_SESSION}
-                      </span>
-                    </div>
-                    
-                    {/* Department Breakdown */}
-                    <div className="space-y-3">
-                      {[adminDept].map(dept => {
-                        const count = session.allocated[dept];
-                        const limit = DEPT_LIMITS[dept];
-                        const percent = (count / limit) * 100;
-                        const isDeptFull = count >= limit;
-
-                        return (
-                          <div key={dept}>
-                            <div className="flex justify-between text-xs font-medium text-gray-600 mb-1">
-                              <span>{dept}</span>
-                              <span className={isDeptFull ? 'text-red-500' : ''}>{count} / {limit} max</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className={`h-2 rounded-full ${isDeptFull ? 'bg-red-500' : 'bg-green-500'}`} 
-                                style={{ width: `${percent}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-100 p-3 text-center border-t border-gray-200">
-                    {/* Rule 4: System should show remaining available seats */}
-                    <span className="text-sm font-medium text-gray-700">
-                      {remaining} seats remaining
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            {sessions.map((session) => (
+              <SessionCard key={session.id} session={session} adminDept={adminDept} />
+            ))}
           </div>
         </div>
 
@@ -182,14 +170,22 @@ const Dashboard = () => {
             
             <form onSubmit={handleAllocate} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Participant Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. John Doe"
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Select Participant</label>
+                <select 
                   value={participantName}
                   onChange={(e) => setParticipantName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white cursor-pointer"
+                >
+                  <option value="">-- Choose Employee --</option>
+                  {MOCK_USERS.filter(u => u.division === adminDept).map((u) => {
+                    const isAssigned = assignedParticipants.has(u.name.toLowerCase());
+                    return (
+                      <option key={u.id} value={u.name} disabled={isAssigned}>
+                        {u.name} {isAssigned ? '(Assigned)' : ''}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <div>
@@ -231,6 +227,31 @@ const Dashboard = () => {
                 {feedback.message}
               </div>
             )}
+          </div>
+
+          {/* Your Employees Roster List */}
+          <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex flex-col" style={{ maxHeight: '400px' }}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-800">Your Employees</h2>
+              <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">
+                {MOCK_USERS.filter(u => u.division === adminDept).length} Total
+              </span>
+            </div>
+            <div className="overflow-y-auto space-y-2 pr-2">
+              {MOCK_USERS.filter(u => u.division === adminDept).map(u => {
+                const isAssigned = assignedParticipants.has(u.name.toLowerCase());
+                return (
+                  <div key={u.id} className="flex justify-between items-center p-2 bg-gray-50 rounded border border-gray-100 text-sm">
+                    <span className="font-medium text-gray-700">{u.name}</span>
+                    {isAssigned ? (
+                      <span className="text-xs text-green-700 font-semibold px-2 py-0.5 bg-green-100 rounded-full">Assigned</span>
+                    ) : (
+                      <span className="text-xs text-gray-500 font-medium px-2 py-0.5 bg-gray-200 rounded-full">Unassigned</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm text-sm text-blue-900">

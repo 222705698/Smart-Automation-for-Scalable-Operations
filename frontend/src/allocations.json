@@ -1,0 +1,66 @@
+[
+  {
+    "id": "Morning",
+    "time": "09:00 - 10:30",
+    "allocated": {
+      "Division A": 8,
+      "Division B": 6,
+      "Division C": 6
+    },
+    "participants": [
+      "Division A Employee 1",
+      "Division A Employee 2",
+      "Division A Employee 3",
+      "Division A Employee 4",
+      "Division A Employee 5",
+      "Division A Employee 6",
+      "Division A Employee 7",
+      "Division A Employee 8",
+      "Division B Employee 1",
+      "Division B Employee 2",
+      "Division B Employee 3",
+      "Division B Employee 4",
+      "Division B Employee 5",
+      "Division B Employee 6",
+      "Division C Employee 1",
+      "Division C Employee 2",
+      "Division C Employee 3",
+      "Division C Employee 4",
+      "Division C Employee 5",
+      "Division C Employee 6"
+    ]
+  },
+  {
+    "id": "Midday",
+    "time": "11:00 - 12:30",
+    "allocated": {
+      "Division A": 4,
+      "Division B": 4,
+      "Division C": 4
+    },
+    "participants": [
+      "Division A Employee 9",
+      "Division A Employee 10",
+      "Division A Employee 11",
+      "Division A Employee 12",
+      "Division B Employee 7",
+      "Division B Employee 8",
+      "Division B Employee 9",
+      "Division B Employee 10",
+      "Division C Employee 7",
+      "Division C Employee 8",
+      "Division C Employee 9",
+      "Division C Employee 10"
+    ]
+  },
+  {
+    "id": "Afternoon",
+    "time": "13:00 - 14:30",
+    "allocated": {
+      "Division A": 0,
+      "Division B": 0,
+      "Division C": 0
+    },
+    "participants": []
+  }
+]

@@ -1,0 +1,5 @@
+[
+  { "email": "admina@test.com", "name": "Alice (Div A Admin)", "division": "Division A" },
+  { "email": "adminb@test.com", "name": "Bob (Div B Admin)", "division": "Division B" },
+  { "email": "adminc@test.com", "name": "Charlie (Div C Admin)", "division": "Division C" }
+]
