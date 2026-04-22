@@ -1,0 +1,4 @@
+node_modules/
+.env
+smart-seat-allocation/node_modules/
+seat-allocation-backend/node_modules/
